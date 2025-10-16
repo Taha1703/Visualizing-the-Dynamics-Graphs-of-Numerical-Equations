@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Michaelis–Menten – Interaktive Visualisierung</title>
+
+  <!-- JSXGraph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraphcore.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraph.min.css" />
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; margin: 0; padding: 2rem; display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 2rem; color: #264653; margin-bottom: 0.5rem; }
+    .equation { font-size: 1.3rem; margin-bottom: 1rem; color: #444; text-align: center; }
+    #graph { width: 800px; height: 500px; border: 1px solid #ccc; background: white; margin-bottom: 2rem; }
+    .controls { display: flex; flex-direction: column; gap: 0.5rem; width: 90%; max-width: 600px; }
+    .slider-container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .slider-label { min-width: 80px; font-weight: 500; color: #555; }
+    .slider { flex-grow: 1; }
+    .value-label { width: 60px; text-align: right; font-family: monospace; color: #222; }
+  </style>
+</head>
+<body>
+
+  <h1>Michaelis–Menten</h1>
+  <div class="equation">
+    \( v(S) = v_{\max}\,\dfrac{S}{K_m + S} \)
+  </div>
+
+  <div id="graph"></div>
+
+  <div class="controls">
+    <div class="slider-container">
+      <label class="slider-label">\(v_{\max}\):</label>
+      <input id="vmaxSlider" type="range" class="slider" min="0.1" max="20.0" step="0.1" value="5.0">
+      <span id="vmaxValue" class="value-label">5.0</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">\(K_m\):</label>
+      <input id="kmSlider" type="range" class="slider" min="0.1" max="20.0" step="0.1" value="2.0">
+      <span id="kmValue" class="value-label">2.0</span>
+    </div>
+  </div>
+
+  <script>
+    
+    const board = JXG.JSXGraph.initBoard("graph", {
+      boundingbox: [-0.2, 6, 20.2, -0.1],
+      showNavigation: false,
+      showCopyright: false,
+      axis: false
+    });
+
+    
+    const xAxis = board.create('axis', [[0, 0], [1, 0]], {
+      withLabel: false,
+      ticks: { drawLabels: true, minorTicks: 0, ticksDistance: 5, label: { fontSize: 14 } }
+    });
+
+    const yAxis = board.create('axis', [[0, 0], [0, 1]], {
+      withLabel: false,
+      ticks: {
+        drawLabels: true,
+        minorTicks: 0,
+        ticksDistance: 1,
+        
+        label: { fontSize: 14, anchorX: 'right', offset: [-10, 0] }
+      }
+    });
+
+    
+    const sliders = {
+      vmax: document.getElementById("vmaxSlider"),
+      km: document.getElementById("kmSlider")
+    };
+    const labels = {
+      vmax: document.getElementById("vmaxValue"),
+      km: document.getElementById("kmValue")
+    };
+
+    let objects = [];
+
+    function vOfS(S, vmax, Km) {
+      return vmax * (S / (Km + S));
+    }
+
+    function updatePlot() {
+      const vmax = parseFloat(sliders.vmax.value);
+      const Km = parseFloat(sliders.km.value);
+
+      labels.vmax.textContent = vmax.toFixed(1);
+      labels.km.textContent = Km.toFixed(1);
+
+      
+      const Svals = [];
+      const Vvals = [];
+      const step = 0.05;
+      for (let S = 0; S <= 20; S += step) {
+        Svals.push(S);
+        Vvals.push(vOfS(S, vmax, Km));
+      }
+
+     
+      objects.forEach(o => board.removeObject(o));
+      objects = [];
+
+      
+      const curve = board.create('curve', [Svals, Vvals], {
+        strokeWidth: 2,
+        strokeColor: '#e76f51',
+        highlight: false
+      });
+      objects.push(curve);
+
+      
+
+      
+      const top = Math.max(...Vvals);
+      const padY = (top) * 0.1 || 1;
+      board.setBoundingBox([-0.2, top + padY, 20.2, -0.2]); 
+
+      
+      const pixelPaddingBottom = 24; 
+      const pixelPaddingLeft   = 40; 
+
+      const bottomUnits = pixelPaddingBottom / board.unitY;
+      const leftUnits   = pixelPaddingLeft   / board.unitX;
+
+      const finalBottom = -Math.max(0.2, bottomUnits);
+      const finalLeft   = -Math.max(0.2, leftUnits);
+
+      board.setBoundingBox([finalLeft, top + padY, 20.2, finalBottom]);
+    }
+
+    Object.values(sliders).forEach(s => s.addEventListener('input', updatePlot));
+    updatePlot();
+  </script>
+</body>
+</html>

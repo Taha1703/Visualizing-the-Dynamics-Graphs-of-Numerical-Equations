@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hill-Gleichung – Interaktive Visualisierung</title>
+
+  <!-- JSXGraph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraphcore.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraph.min.css" />
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; margin: 0; padding: 2rem; display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 2rem; color: #264653; margin-bottom: 0.5rem; }
+    .equation { font-size: 1.3rem; margin-bottom: 1rem; color: #444; text-align: center; }
+    #graph { width: 800px; height: 500px; border: 1px solid #ccc; background: white; margin-bottom: 1rem; }
+    .controls { display: flex; flex-direction: column; gap: 0.5rem; width: 90%; max-width: 600px; margin-bottom: 1.5rem; }
+    .slider-container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .slider-label { min-width: 60px; font-weight: 500; color: #555; }
+    .slider { flex-grow: 1; }
+    .value-label { width: 50px; text-align: right; font-family: monospace; color: #222; }
+    p { max-width: 700px; text-align: center; font-size: 1.1rem; margin-top: 0.5rem; color: #333; }
+  </style>
+</head>
+<body>
+
+  <h1>Hill-Gleichung</h1>
+  <div class="equation">
+    \( \theta(L) = \dfrac{L^{\,n}}{K_A^{\,n} + L^{\,n}} \)
+  </div>
+
+  <div id="graph"></div>
+
+  <div class="controls">
+    <div class="slider-container">
+      <label class="slider-label">\(K_A\):</label>
+      <input id="KSlider" type="range" class="slider" min="0.1" max="5.0" step="0.1" value="1.0">
+      <span id="KValue" class="value-label">1.0</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">n:</label>
+      <input id="nSlider" type="range" class="slider" min="0.1" max="5.0" step="0.1" value="1.0">
+      <span id="nValue" class="value-label">1.0</span>
+    </div>
+  </div>
+
+  <p>
+    Die Hill-Gleichung beschreibt die Bindung von Liganden an Makromoleküle.<br>
+    Die Halbsättigung \(K_A\) und der Hill-Koeffizient \(n\) lassen sich mit den Schiebereglern oben anpassen.
+  </p>
+
+  <script>
+    const board = JXG.JSXGraph.initBoard("graph", {
+      boundingbox: [-0.2, 1.1, 20.2, -0.1],
+      showNavigation: false,
+      showCopyright: false,
+      axis: false
+    });
+
+    const xAxis = board.create('axis', [[0, 0], [1, 0]], {
+      withLabel: false,
+      ticks: { drawLabels: true, minorTicks: 0, ticksDistance: 5, label: { fontSize: 14 } }
+    });
+
+    const yAxis = board.create('axis', [[0, 0], [0, 1]], {
+      withLabel: false,
+      ticks: {
+        drawLabels: true,
+        minorTicks: 0,
+        ticksDistance: 0.2,
+        label: { fontSize: 14, offset: [-25, 0] } 
+      }
+    });
+
+    const sliders = {
+      K: document.getElementById("KSlider"),
+      n: document.getElementById("nSlider"),
+    };
+    const labels = {
+      K: document.getElementById("KValue"),
+      n: document.getElementById("nValue"),
+    };
+
+    let objects = [];
+
+    function theta(L, K, n) {
+      const Ln = Math.pow(L, n);
+      const Kn = Math.pow(K, n);
+      return Ln / (Kn + Ln);
+    }
+
+    function updatePlot() {
+      const K = parseFloat(sliders.K.value);
+      const n = parseFloat(sliders.n.value);
+
+      labels.K.textContent = K.toFixed(1);
+      labels.n.textContent = n.toFixed(1);
+
+      const Ls = [];
+      const Th = [];
+      const step = 0.05;
+      for (let x = 0; x <= 20; x += step) {
+        Ls.push(x);
+        Th.push(theta(x, K, n));
+      }
+
+      objects.forEach(o => board.removeObject(o));
+      objects = [];
+
+      const curve = board.create('curve', [Ls, Th], {
+        strokeWidth: 2,
+        strokeColor: '#e76f51',
+        highlight: false
+      });
+      objects.push(curve);
+
+      board.setBoundingBox([-0.8, 1.1, 20.2, -0.1]);
+    }
+
+    Object.values(sliders).forEach(s => s.addEventListener('input', updatePlot));
+    updatePlot();
+  </script>
+</body>
+</html>

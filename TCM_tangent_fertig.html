@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tangente & Sekante – Interaktive Visualisierung</title>
+
+  <!-- JSXGraph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraphcore.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraph.min.css" />
+
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; margin: 0; padding: 2rem;
+           display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 2rem; color: #264653; margin-bottom: 0.5rem; }
+    .equation { font-size: 1.1rem; margin-bottom: 1rem; color: #444; text-align: center; }
+
+    .boards-wrap { display: flex; gap: 16px; margin-bottom: 1.5rem; }
+    .board { width: 392px; height: 500px; border: 1px solid #ccc; background: white; }
+
+    .controls { display: flex; flex-direction: column; gap: 0.6rem; width: 90%; max-width: 800px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .row label { min-width: 120px; color: #555; font-weight: 500; }
+    input[type="text"] { flex: 1; min-width: 220px; padding: 0.4rem 0.6rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
+    select { padding: 0.4rem 0.6rem; border: 1px solid #ccc; border-radius: 6px; }
+    .radios { display: flex; gap: 20px; align-items: center; }
+    .feedback { color: #333; font-family: monospace; }
+
+    .button-row { display: flex; gap: 8px; }
+    .button-row button {
+      background: #5a7d9a; color: white; border: 1px solid #5a7d9a;
+      border-radius: 6px; cursor: pointer; transition: all 0.2s;
+      padding: 0.5rem 1rem; font-size: 1rem;
+    }
+    .button-row button:hover { background: #48647a; border-color: #48647a; }
+  </style>
+</head>
+<body>
+
+  <h1>Tangente & Sekante</h1>
+  <div class="equation">
+    Klicke oder ziehe Punkte in einer der beiden Graphen um diese zu verschieben.
+  </div>
+
+  <div class="boards-wrap">
+    <div id="boardF" class="board"></div>
+    <div id="boardD" class="board"></div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <label>Beispiel:</label>
+      <select id="exampleSelect">
+        <option value="Parabel">Parabel: f(x)=x^2</option>
+        <option value="Rational">Rational: f(x)=1/(1+x^2)</option>
+        <option value="Trigonometrisch">Trigonometrisch: f(x)=sin(x)+sin(3x)/3</option>
+      </select>
+      <span class="feedback" id="slopeOut">Steigung: NaN</span>
+    </div>
+
+    <div class="row">
+      <label>Funktion f(x):</label>
+      <input type="text" id="fxInput" value="x**2">
+    </div>
+
+    <div class="row">
+      <label>Modus:</label>
+      <div class="radios">
+        <label><input type="radio" name="mode" value="tangent" checked> Tangente</label>
+        <label><input type="radio" name="mode" value="secant"> Sekante</label>
+      </div>
+      <div class="button-row">
+        <button id="resetBtn">Zurücksetzen</button>
+        <button id="applyBtn">Anwenden</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    
+    const withMath = expr => `with (Math) { return (${expr}); }`;
+    function makeFn(expr) {
+      const norm = expr.replace(/\^/g, '**').replace(/(\d)(x)/g, '$1*$2');
+      return new Function('x', withMath(norm));
+    }
+    function numericDerivative(f, h=1e-6) { return x => (f(x+h)-f(x-h))/(2*h); }
+    function sample(f, a, b, step=0.01) {
+      const xs=[], ys=[]; for (let x=a; x<=b+1e-12; x+=step){ xs.push(x); ys.push(f(x)); }
+      return [xs, ys];
+    }
+    function minmax(a){ let mn=Infinity,mx=-Infinity; for(const v of a){ if(v<mn) mn=v; if(v>mx) mx=v; } return [mn,mx]; }
+
+    
+    const boardF = JXG.JSXGraph.initBoard('boardF', {
+      boundingbox: [-3.5, 4, 3.5, -2], axis:false, showNavigation:false, showCopyright:false
+    });
+    boardF.create('axis', [[0,0],[1,0]], { ticks:{ drawLabels:true, minorTicks:0, label:{ fontSize:14 } }});
+    boardF.create('axis', [[0,0],[0,1]], { ticks:{ drawLabels:true, minorTicks:0, label:{ fontSize:14, anchorX:'right', offset:[-15,0] } }});
+
+    const boardD = JXG.JSXGraph.initBoard('boardD', {
+      boundingbox: [-3.5, 4, 3.5, -2], axis:false, showNavigation:false, showCopyright:false
+    });
+    boardD.create('axis', [[0,0],[1,0]], { ticks:{ drawLabels:true, minorTicks:0, label:{ fontSize:14 } }});
+    boardD.create('axis', [[0,0],[0,1]], { ticks:{ drawLabels:true, minorTicks:0, label:{ fontSize:14, anchorX:'right', offset:[-15,0] } }});
+
+    
+    const fxInput = document.getElementById('fxInput');
+    const exampleSelect = document.getElementById('exampleSelect');
+    const slopeOut = document.getElementById('slopeOut');
+    const modeRadios = [...document.querySelectorAll('input[name="mode"]')];
+    const resetBtn = document.getElementById('resetBtn');
+    const applyBtn = document.getElementById('applyBtn');
+
+    let f = makeFn(fxInput.value);
+    let df = numericDerivative(f);
+    let mode = 'tangent';
+    let points = [];          
+
+    
+    let pT = null;            
+    let pA = null, pB = null; 
+
+    
+    let objectsF = [];
+    let objectsD = [];
+
+    const view = { xmin:-2, xmax:2, ymin:-2, ymax:4 };
+
+    function clearObjects() {
+      for (const o of objectsF) boardF.removeObject(o);
+      for (const o of objectsD) boardD.removeObject(o);
+      objectsF = []; objectsD = [];
+    }
+
+    function setBounding(ymin, ymax) {
+      const padX = (view.xmax - view.xmin) * 0.5;
+      const padY = (ymax - ymin) * 0.15;
+      boardF.setBoundingBox([view.xmin - padX, ymax + padY, view.xmax + padX, ymin - padY]);
+      boardD.setBoundingBox([view.xmin - padX, ymax + padY, view.xmax + padX, ymin - padY]);
+    }
+
+    function ensureDraggablePoints() {
+      if (mode === 'tangent') {
+        if (points.length < 1) points = [0]; 
+        const x0 = points[0], y0 = f(x0);
+        if (!pT) {
+          pT = boardF.create('point', [x0, y0], { size: 4, color: '#264653', name: '' });
+          pT.on('drag', () => { points[0] = pT.X(); draw(); });
+        } else {
+          pT.moveTo([x0, y0], 0);
+          pT.setAttribute({ visible: true });
+        }
+        if (pA) pA.setAttribute({ visible:false });
+        if (pB) pB.setAttribute({ visible:false });
+      } else {
+        if (points.length < 2) {
+          if (points.length === 0) points = [-1, 1];
+          if (points.length === 1) points.push(points[0] + 1);
+        }
+        const xA = points[0], xB = points[1];
+        const yA = f(xA),     yB = f(xB);
+
+        if (!pA) {
+          pA = boardF.create('point', [xA, yA], { size: 4, color: '#264653', name: '' });
+          pA.on('drag', () => { points[0] = pA.X(); draw(); });
+        } else {
+          pA.moveTo([xA, yA], 0);
+          pA.setAttribute({ visible: true });
+        }
+        if (!pB) {
+          pB = boardF.create('point', [xB, yB], { size: 4, color: '#264653', name: '' });
+          pB.on('drag', () => { points[1] = pB.X(); draw(); });
+        } else {
+          pB.moveTo([xB, yB], 0);
+          pB.setAttribute({ visible: true });
+        }
+        if (pT) pT.setAttribute({ visible:false });
+      }
+    }
+
+    function draw() {
+      clearObjects();
+
+      
+      const h = view.xmax - view.xmin;
+      const [xsF, ysF] = sample(f, view.xmin - h, view.xmax + h, 0.01);
+      const [mnF, mxF] = minmax(ysF);
+      const pad = Math.max(0.5, 0.125 * (mxF - mnF || 1));
+      const ymin = Math.min(-1, mnF - pad);
+      const ymax = Math.max( 1, mxF + pad);
+      setBounding(ymin, ymax);
+
+      
+      objectsF.push(boardF.create('curve', [xsF, ysF], { strokeColor:'#e76f51', strokeWidth:2, fixed:true }));
+      objectsF.push(boardF.create('line', [[-1000,0],[1000,0]], { strokeColor:'black', straightFirst:true, straightLast:true, fixed:true }));
+
+      
+      const [xsD, ysD] = sample(df, view.xmin - h, view.xmax + h, 0.01);
+      objectsD.push(boardD.create('curve', [xsD, ysD], { strokeColor:'#e76f51', strokeWidth:2, fixed:true }));
+      objectsD.push(boardD.create('line', [[-1000,0],[1000,0]], { strokeColor:'black', straightFirst:true, straightLast:true, fixed:true }));
+
+      
+      ensureDraggablePoints();
+
+      if (mode === 'tangent') {
+        const x0 = points[0], y0 = f(x0), d0 = df(x0);
+        const tanVals = xsF.map(x => d0*(x - x0) + y0);
+        objectsF.push(boardF.create('curve', [xsF, tanVals], { strokeColor:'#2a9d8f', strokeWidth:1.5, fixed:true }));
+
+        objectsD.push(boardD.create('point', [x0, d0], { size:4, color:'red', fixed:true, name: '' }));
+        objectsD.push(boardD.create('segment', [[x0,0],[x0,d0]], { strokeWidth:1.25, fixed:true }));
+        slopeOut.textContent = `Steigung: ${d0.toFixed(4)}`;
+
+      } else {
+        
+        const xA = points[0], xB = points[1];
+        if (xA === xB) { slopeOut.textContent = 'Steigung: NaN'; return; }
+
+        
+        const xa = Math.min(xA, xB), xb = Math.max(xA, xB);
+        const ya = f(xa),           yb = f(xb);
+        const m  = (yb - ya) / (xb - xa);
+
+        
+        const secVals = xsF.map(x => m*(x - xa) + ya);
+        objectsF.push(boardF.create('curve', [xsF, secVals], { strokeColor:'#2a9d8f', dash:2, strokeWidth:1.5, fixed:true }));
+        objectsF.push(boardF.create('segment', [[xa,0],[xa,ya]], { strokeColor:'#999', dash:1, fixed:true }));
+        objectsF.push(boardF.create('segment', [[xb,0],[xb,yb]], { strokeColor:'#999', dash:1, fixed:true }));
+
+        
+        const step = Math.max(0.005, Math.min(0.05, Math.abs(xb - xa) / 200));
+        const xsTop=[], ysTop=[];
+        for (let x=xa; x<=xb+1e-12; x+=step) { xsTop.push(x); ysTop.push(df(x)); }
+        const xsBot=[], ysBot=[];
+        for (let x=xb; x>=xa-1e-12; x-=step) { xsBot.push(x); ysBot.push(m); }
+        const xsFill = xsTop.concat(xsBot, [xsTop[0]]);
+        const ysFill = ysTop.concat(ysBot, [ysTop[0]]);
+        objectsD.push(boardD.create('curve', [xsFill, ysFill], {
+          fillColor:'#7eaedc', fillOpacity:0.35, strokeOpacity:0, fixed:true
+        }));
+
+        
+        objectsD.push(boardD.create('segment', [[xa, m], [xb, m]], {
+          strokeColor:'#2a9d8f', dash:2, fixed:true
+        }));
+
+        slopeOut.textContent = `Steigung: ${m.toFixed(4)}`;
+      }
+    }
+
+    
+    function setMode(newMode){ mode=newMode; points=[]; draw(); }
+    function applyFx(){
+      try { f = makeFn(fxInput.value); df = numericDerivative(f); }
+      catch { alert('Fehler in f(x).'); return; }
+      points=[]; draw();
+    }
+    function resetAll(){ points=[]; draw(); }
+
+    
+    function pickX(board, evt) {
+      const x = board.getUsrCoordsOfMouse(evt)[0];
+      if (mode === 'tangent') {
+        points = [x];
+        if (pT) pT.moveTo([x, f(x)], 0);
+      } else {
+        if (points.length < 2) {
+          points.push(x);
+        } else {
+          
+          const d0 = Math.abs(points[0]-x), d1 = Math.abs(points[1]-x);
+          if (d0 <= d1) points[0] = x; else points[1] = x;
+        }
+        if (pA) pA.moveTo([points[0], f(points[0])], 0);
+        if (pB) pB.moveTo([points[1], f(points[1])], 0);
+      }
+      draw();
+    }
+    boardF.on('down', evt => pickX(boardF, evt));
+    boardD.on('down', evt => pickX(boardD, evt));
+
+    
+    modeRadios.forEach(r => r.addEventListener('change', () => setMode(r.value)));
+    applyBtn.addEventListener('click', applyFx);
+    resetBtn.addEventListener('click', resetAll);
+    exampleSelect.addEventListener('change', () => {
+      const v = exampleSelect.value;
+      if (v==='Parabel') fxInput.value='x**2';
+      if (v==='Rational') fxInput.value='1/(1+x**2)';
+      if (v==='Trigonometrisch') fxInput.value='sin(x)+sin(3*x)/3';
+      applyFx();
+    });
+
+    
+    applyFx();
+  </script>
+</body>
+</html>

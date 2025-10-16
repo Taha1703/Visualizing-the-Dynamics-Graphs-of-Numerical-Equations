@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Diffusion durch eine Membran – Simulation</title>
+
+  <!-- JSXGraph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraphcore.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraph.min.css" />
+
+  <!-- MathJax  -->
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']] }, svg: { fontCache: 'global' } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; margin: 0; padding: 2rem;
+           display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 2rem; color: #264653; margin-bottom: 0.5rem; }
+    .equation { font-size: 1.2rem; margin-bottom: 1rem; color: #444; }
+
+    #box { width: 800px; height: 500px; border: 1px solid #ccc; background: #fff; margin-bottom: 2rem; }
+
+    .legend { margin-top: -0.6rem; margin-bottom: 0.6rem; color: #555; }
+    .controls { display: flex; flex-direction: column; gap: 0.5rem; width: 90%; max-width: 600px; }
+    .slider-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .slider-row label { min-width: 80px; font-weight: 500; color: #555; }
+    .slider-row input[type="range"] { flex: 1; }
+    .value { width: 80px; text-align: right; font-family: monospace; color: #222; }
+  </style>
+</head>
+<body>
+
+  <h1>Diffusion durch eine Membran</h1>
+  <div class="equation">
+    \( c_1(t)=\tfrac12(C_1+C_2)+\tfrac12(C_1-C_2)\,e^{-2k t},\quad c_2(t)=C_1+C_2-c_1(t) \)
+  </div>
+
+  <div id="box"></div>
+  <div class="legend">⎯ <span style="color:#e76f51;">c₁(t)</span> &nbsp;&nbsp; ⎯ <span style="color:#2a9d8f;">c₂(t)</span></div>
+
+  <div class="controls">
+    <div class="slider-row">
+      <label>C₁:</label>
+      <input id="c10" type="range" min="0" max="100" step="0.5" value="50">
+      <span id="c10v" class="value">50.0</span>
+    </div>
+    <div class="slider-row">
+      <label>C₂:</label>
+      <input id="c20" type="range" min="0" max="100" step="0.5" value="0">
+      <span id="c20v" class="value">0.0</span>
+    </div>
+    <div class="slider-row">
+      <label>k:</label>
+      <input id="k" type="range" min="0.0001" max="0.02" step="0.0001" value="0.0005">
+      <span id="kv" class="value">5.0e-4</span>
+    </div>
+  </div>
+
+  <script>
+   
+    const boxEl = document.getElementById('box');
+    const board = JXG.JSXGraph.initBoard('box', {
+      
+      boundingbox: [-1, 100, 60, -0.2],
+      axis: false,
+      showNavigation: false,
+      showCopyright: false
+    });
+
+    
+    board.create('axis', [[0, 0], [1, 0]], {
+      ticks: { drawLabels: true, minorTicks: 0, label: { fontSize: 14 } }
+    });
+    board.create('axis', [[0, 0], [0, 1]], {
+      ticks: { drawLabels: true, minorTicks: 0, label: { fontSize: 14, anchorX: 'right', offset: [-15, 0] } }
+    });
+
+   
+    const el = {
+      c10: document.getElementById('c10'),
+      c20: document.getElementById('c20'),
+      k:   document.getElementById('k'),
+      c10v: document.getElementById('c10v'),
+      c20v: document.getElementById('c20v'),
+      kv:   document.getElementById('kv')
+    };
+
+    
+    const T = 200;                  
+    const N = 300;                 
+    const t = Array.from({length: N+1}, (_,i) => i*(T/N));
+
+    let objects = [];
+
+    function removeAll() {
+      objects.forEach(o => board.removeObject(o));
+      objects = [];
+    }
+
+    function updateLabels(C1, C2, k) {
+      el.c10v.textContent = C1.toFixed(1);
+      el.c20v.textContent = C2.toFixed(1);
+      el.kv.textContent   = k.toExponential(1);
+    }
+
+    function solve(C1, C2, k) {
+      const S  = C1 + C2;
+      const D0 = C1 - C2;
+      const c1 = t.map(tt => 0.5*S + 0.5*D0*Math.exp(-2*k*tt));
+      const c2 = c1.map(v => S - v);
+      return { c1, c2 };
+    }
+
+    
+    function setBoundingWithLabelPadding(minX, maxX, minY, maxY) {
+      
+      const xPad = Math.max(0.02 * (maxX - minX), 0); 
+      const yPad = Math.max(1, 0.1 * (maxY - minY || 10));
+
+      
+      const w = boxEl.clientWidth || 800;
+      const h = boxEl.clientHeight || 500;
+
+      
+      const unitX = ((maxX - minX) + 2 * xPad) / w;
+      const unitY = ((maxY - minY) + 2 * yPad) / h;
+
+      
+      const extraLeft   = 40 * unitX;
+      const extraBottom = 30 * unitY;
+
+      board.setBoundingBox([
+        minX - xPad - extraLeft,      
+        maxY + yPad,                  
+        maxX + xPad,                  
+        Math.min(0, minY - yPad - extraBottom) 
+      ]);
+    }
+
+    function redraw() {
+      const C1 = parseFloat(el.c10.value);
+      const C2 = parseFloat(el.c20.value);
+      const k  = parseFloat(el.k.value);
+      updateLabels(C1, C2, k);
+
+      const { c1, c2 } = solve(C1, C2, k);
+
+      
+      removeAll();
+
+      
+      const xs = t;
+      const c1curve = board.create('curve', [xs, c1], { strokeColor: '#e76f51', strokeWidth: 2, highlight:false, fixed:true });
+      const c2curve = board.create('curve', [xs, c2], { strokeColor: '#2a9d8f', strokeWidth: 2, highlight:false, fixed:true });
+      objects.push(c1curve, c2curve);
+
+      
+      const maxY = Math.max(...c1, ...c2, 1);
+      const minY = Math.min(...c1, ...c2, 0);
+      setBoundingWithLabelPadding(0, T, minY, maxY);
+    }
+
+    
+    ['input','change'].forEach(evt => {
+      el.c10.addEventListener(evt, redraw);
+      el.c20.addEventListener(evt, redraw);
+      el.k.addEventListener(evt, redraw);
+    });
+    
+    window.addEventListener('resize', redraw);
+
+    
+    redraw();
+  </script>
+</body>
+</html>

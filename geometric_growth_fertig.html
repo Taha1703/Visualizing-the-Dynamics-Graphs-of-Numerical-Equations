@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Geometrisches Wachstum mit Transport – Simulation</title>
+
+  <!-- JSXGraph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraphcore.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraph.min.css" />
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; margin: 0; padding: 2rem; display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 2rem; color: #264653; margin-bottom: 0.5rem; }
+    .equation { font-size: 1.3rem; margin-bottom: 1rem; color: #444; }
+    #graph { width: 800px; height: 500px; border: 1px solid #ccc; background: white; margin-bottom: 2rem; }
+    .controls { display: flex; flex-direction: column; gap: 0.5rem; width: 90%; max-width: 600px; }
+    .slider-container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .slider-label { min-width: 60px; font-weight: 500; color: #555; }
+    .slider { flex-grow: 1; }
+    .value-label { width: 60px; text-align: right; font-family: monospace; color: #222; }
+  </style>
+</head>
+<body>
+
+  <h1>Geometrisches Wachstum mit Transport</h1>
+  <div class="equation">
+    \( a_{n+1} = q \cdot a_n + b \;\;\; \text{mit} \;\; a_0 = a \)
+  </div>
+
+  <div id="graph"></div>
+
+  <div class="controls">
+    <div class="slider-container">
+      <label class="slider-label">a:</label>
+      <input id="aSlider" type="range" class="slider" min="0.1" max="50.0" step="0.1" value="1.0">
+      <span id="aValue" class="value-label">1.0</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">q:</label>
+      <input id="qSlider" type="range" class="slider" min="0.1" max="2.0" step="0.01" value="1.10">
+      <span id="qValue" class="value-label">1.10</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">b:</label>
+      <input id="bSlider" type="range" class="slider" min="-10.0" max="10.0" step="0.1" value="0.0">
+      <span id="bValue" class="value-label">0.0</span>
+    </div>
+  </div>
+
+  <script>
+    
+    const board = JXG.JSXGraph.initBoard("graph", {
+      boundingbox: [-0.2, 2, 2, -0.1], 
+      showNavigation: false,
+      showCopyright: false,
+      axis: false
+    });
+
+    
+    const xAxis = board.create('axis', [[0, 0], [1, 0]], {
+      withLabel: false,
+      ticks: {
+        drawLabels: true,
+        minorTicks: 0,
+        ticksDistance: 5,
+        label: { fontSize: 14 }
+      }
+    });
+
+    const yAxis = board.create('axis', [[0, 0], [0, 1]], {
+      withLabel: false,
+      ticks: {
+        drawLabels: true,
+        minorTicks: 0,
+        ticksDistance: 5,
+        
+        label: { fontSize: 14, anchorX: 'right', offset: [-10, 0] }
+      }
+    });
+
+    
+    const sliders = {
+      a: document.getElementById("aSlider"),
+      q: document.getElementById("qSlider"),
+      b: document.getElementById("bSlider"),
+    };
+    
+    const labels = {
+      a: document.getElementById("aValue"),
+      q: document.getElementById("qValue"),
+      b: document.getElementById("bValue"),
+    };
+
+    let plotted = [];
+
+    function updatePlot() {
+  const a0 = parseFloat(sliders.a.value);
+  const q = parseFloat(sliders.q.value);
+  const b = parseFloat(sliders.b.value);
+  const steps = 30;
+
+  labels.a.textContent = a0.toFixed(1);
+  labels.q.textContent = q.toFixed(2);
+  labels.b.textContent = b.toFixed(1);
+
+  
+  let a = a0;
+  const seq = [[0, a]];
+  for (let i = 1; i <= steps; i++) {
+    a = q * a + b;
+    seq.push([i, a]);
+  }
+
+  
+  plotted.forEach(obj => board.removeObject(obj));
+  plotted = [];
+
+  
+  const xs = seq.map((_, i) => (i / steps) * 2);
+  const ys = seq.map(p => p[1]);
+
+  
+  xs.forEach((xVal, i) => {
+    plotted.push(
+      board.create("point", [xVal, ys[i]], {
+        size: 2, name: "", color: "#264653", fixed: true, highlight: false
+      })
+    );
+  });
+  const curve = board.create("curve", [xs, ys], {
+    strokeWidth: 2, strokeColor: "#e76f51", highlight: false
+  });
+  plotted.push(curve);
+
+  
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const yPad = (maxY - minY) * 0.1 || 1;
+
+  const pixelPaddingBottom = 24; 
+  const pixelPaddingLeft   = 40; 
+  const bottomUnits = pixelPaddingBottom / board.unitY;
+  const leftUnits   = pixelPaddingLeft   / board.unitX;
+
+  
+  const bottomY = Math.min(minY - yPad, -Math.max(0.2, bottomUnits));
+  
+  const leftX = -Math.max(0.2, leftUnits);
+
+  board.setBoundingBox([
+    leftX,            
+    maxY + yPad,       
+    2,                 
+    bottomY            
+  ]);
+}
+
+
+    Object.values(sliders).forEach(s => s.addEventListener("input", updatePlot));
+    updatePlot();
+  </script>
+</body>
+</html>

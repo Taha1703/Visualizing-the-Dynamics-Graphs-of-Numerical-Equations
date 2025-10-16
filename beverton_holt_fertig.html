@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beverton–Holt – Simulation</title>
+
+  <!-- JSXGraph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraphcore.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsxgraph/1.6.0/jsxgraph.min.css" />
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; margin: 0; padding: 2rem; display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 2rem; color: #264653; margin-bottom: 0.5rem; }
+    .equation { font-size: 1.3rem; margin-bottom: 1rem; color: #444; }
+    #graph { width: 800px; height: 500px; border: 1px solid #ccc; background: white; margin-bottom: 2rem; }
+    .controls { display: flex; flex-direction: column; gap: 0.5rem; width: 90%; max-width: 600px; }
+    .slider-container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .slider-label { min-width: 60px; font-weight: 500; color: #555; }
+    .slider { flex-grow: 1; }
+    .value-label { width: 50px; text-align: right; font-family: monospace; color: #222; }
+  </style>
+</head>
+<body>
+
+  <h1>Simulation des Beverton–Holt-Modells</h1>
+  <div class="equation">
+    \( a_{n+1} = \dfrac{q \cdot a_n}{1 + K \cdot a_n} \)
+  </div>
+
+  <div id="graph"></div>
+
+  <div class="controls">
+    <div class="slider-container">
+      <label class="slider-label">q:</label>
+      <input id="qSlider" type="range" class="slider" min="0.1" max="5.0" step="0.1" value="1.2">
+      <span id="qValue" class="value-label">1.2</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">K:</label>
+      <input id="kSlider" type="range" class="slider" min="0.01" max="2.00" step="0.01" value="0.10">
+      <span id="kValue" class="value-label">0.10</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">a₀:</label>
+      <input id="a0Slider" type="range" class="slider" min="0.1" max="50.0" step="0.1" value="1.0">
+      <span id="a0Value" class="value-label">1.0</span>
+    </div>
+    <div class="slider-container">
+      <label class="slider-label">n:</label>
+      <input id="stepSlider" type="range" class="slider" min="10" max="50" step="1" value="30">
+      <span id="stepValue" class="value-label">30</span>
+    </div>
+  </div>
+
+  <p>
+    Dieses Diagramm zeigt die Entwicklung einer Population nach dem Beverton-Holt-Modell.<br>
+   
+<div style="text-align: center;">
+        Die Parameter <strong>q</strong>, <strong>K</strong> und <strong>a₀</strong> lassen sich mit den Schiebereglern oben anpassen.
+  <div>
+    </p>
+
+
+  <script>
+    const board = JXG.JSXGraph.initBoard("graph", {
+      boundingbox: [-0.1, 2, 2, -0.1],
+      showNavigation: false,
+      showCopyright: false,
+      axis: false
+    });
+
+    const xAxis = board.create('axis', [[0, 0], [1, 0]], {
+      withLabel: false,
+      ticks: { drawLabels: true, minorTicks: 0, ticksDistance: 5, label: { fontSize: 14 } }
+    });
+
+     const yAxis = board.create('axis', [[0, 0], [0, 1]], {
+      withLabel: false,
+      ticks: { 
+        drawLabels: true,
+        minorTicks: 0,
+        ticksDistance: 5,
+        label: { fontSize: 14, anchorX: 'right', offset: [-8, 0] } 
+      }
+    });
+
+    const sliders = {
+      q: document.getElementById("qSlider"),
+      K: document.getElementById("kSlider"),
+      a0: document.getElementById("a0Slider"),
+      steps: document.getElementById("stepSlider"),
+    };
+
+    const labels = {
+      q: document.getElementById("qValue"),
+      K: document.getElementById("kValue"),
+      a0: document.getElementById("a0Value"),
+      steps: document.getElementById("stepValue"),
+    };
+
+    let plotted = [];
+
+    function updatePlot() {
+      const q = parseFloat(sliders.q.value);
+      const K = parseFloat(sliders.K.value);
+      const a0 = parseFloat(sliders.a0.value);
+      const steps = parseInt(sliders.steps.value);
+
+      labels.q.textContent = q.toFixed(1);
+      labels.K.textContent = K.toFixed(2);
+      labels.a0.textContent = a0.toFixed(1);
+      labels.steps.textContent = steps;
+
+      
+      let a = a0;
+      const points = [[0, a]];
+      for (let i = 1; i <= steps; i++) {
+        a = (q * a) / (1 + K * a);
+        points.push([i, a]);
+      }
+
+      
+      plotted.forEach((obj) => board.removeObject(obj));
+      plotted = [];
+
+      
+      const xs = points.map((_, i) => (i / steps) * 2);
+      const ys = points.map(p => p[1]);
+
+      xs.forEach((xVal, i) =>
+        plotted.push(
+          board.create("point", [xVal, ys[i]], {
+            size: 2, name: "", color: "#264653", fixed: true, highlight: false,
+          })
+        )
+      );
+
+      const curve = board.create("curve", [xs, ys], {
+        strokeWidth: 2, strokeColor: "#e76f51"
+      });
+      plotted.push(curve);
+
+      
+      const maxY = Math.max(...ys);
+      const yPadding = (maxY) * 0.1 || 1;
+
+      
+      const pixelPaddingBottom = 24;
+      const bottomUnits = pixelPaddingBottom / board.unitY;
+      const bottomY = -Math.max(0.2, bottomUnits);
+
+      
+      const pixelPaddingLeft = 40; 
+      const leftUnits = pixelPaddingLeft / board.unitX;
+      const leftX = -Math.max(0.2, leftUnits);
+
+      board.setBoundingBox([
+        leftX,            
+        maxY + yPadding,   
+        2,                 
+        bottomY            
+      ]);
+    }
+
+    Object.values(sliders).forEach(slider => {
+      slider.addEventListener("input", updatePlot)});
+
+    updatePlot();
+  </script>
+</body>
+</html>
